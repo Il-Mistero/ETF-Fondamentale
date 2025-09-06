@@ -421,89 +421,209 @@ let etfData = [];
 let sortColumn = 9, sortDirection = -1;
 
 // Fetch ETF data from your /api/stocks endpoint
-async function fetchRealETFData(symbol) {
-  try {
-    const response = await fetch(`/api/stocks?symbol=${symbol}`);
-    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-    const data = await response.json();
+        async function fetchETFData(symbol) {
+          try {
+            const response = await fetch(`/api/stocks?symbol=${symbol}`);
+            if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+            const data = await response.json();
+        
+            // Apply valuation logic
+            return calculateETFValuation({
+              currentPrice: data.currentPrice || 0,
+              nav: data.navPrice || data.currentPrice || 0,
+              expenseRatio: data.expenseRatio || 0.005,
+              peRatio: data.peRatio || 0,
+              volume: data.volume || 0,
+              bidPrice: data.bidPrice || 0.05,
+              askPrice: data.askPrice || 0.05,
+              totalAssets: data.totalAssets || 1e9,
+              dividendYield: data.dividendYield || 0,
+            }, symbol);
+        
+          } catch (err) {
+            console.error(`Fetch error for ${symbol}:`, err);
+            return createErrorETF(symbol);
+          }
+        }
+              
+        function calculateETFValuation(data, symbol) {
+          const { currentPrice, nav, expenseRatio, peRatio, volume, bidPrice, askPrice, totalAssets, dividendYield } = data;
+        
+          const navPremiumDiscount = ((currentPrice - nav) / nav) * 100;
+          const efficiencyScore = calculateEfficiencyScore(expenseRatio, nav, currentPrice, bidPrice, askPrice, volume, totalAssets);
+          const valuationScore = calculateValuationScore(navPremiumDiscount, efficiencyScore, expenseRatio, peRatio, dividendYield);
+          const status = determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore);
+        
+          return {
+            name: etfNames[symbol] || symbol,
+            ticker: symbol,
+            nav, currentPrice,
+            premiumDiscount: navPremiumDiscount,
+            expenseRatio, peRatio,
+            efficiencyScore, valuationScore,
+            status
+          };
+        }
+        
+        function calculateEfficiencyScore(expenseRatio, nav, currentPrice, bidPrice, askPrice, volume, totalAssets) {
+          let expenseScore = Math.max(0, 100 - (expenseRatio * 20000));
+          let trackingScore = Math.max(0, 100 - ((nav - currentPrice) * 40));
+          let liquidityScore = Math.min(100, (volume / 1000000) * 20);
+          let spreadScore = Math.max(0, 100 - ((askPrice - bidPrice) * 200));
+          let sizeScore = Math.min(100, Math.log10(totalAssets/1e6) * 20);
+          return expenseScore*0.35 + trackingScore*0.15 + liquidityScore*0.25 + spreadScore*0.15 + sizeScore*0.1;
+        }
+        
+        function calculateValuationScore(nav, currentPrice, efficiencyScore, expenseRatio, peRatio, dividendYield) {
+          let navScore = Math.max(0, Math.min(100, 50 - ((nav-currentPrice * 10)));
+          let expenseScore = Math.max(0, 100 - (expenseRatio * 20000));
+          let peScore = peRatio ? Math.max(0, 100 - ((peRatio - 15) * 2)) : 50;
+          let dividendScore = Math.min(100, dividendYield * 200);
+          return navScore*0.4 + efficiencyScore*0.3 + expenseScore*0.15 + peScore*0.1 + dividendScore*0.05;
+        }
+        
+        function determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore) {
+          if (valuationScore > 70 && navPremiumDiscount <= 0.5) return "Undervalued";
+          if (valuationScore < 40 || navPremiumDiscount > 1.0) return "Overvalued";
+          return "Fair Value";
+        }
+        
+        function createErrorETF(symbol) {
+          return { name: etfNames[symbol] || symbol, ticker: symbol, nav:0,currentPrice:0,premiumDiscount:0,expenseRatio:0,peRatio:0,efficiencyScore:0,valuationScore:0,status:"Data Error" };
+        }
 
-    // Apply valuation logic
-    return calculateETFValuation({
-      currentPrice: data.currentPrice || 0,
-      nav: data.navPrice || data.currentPrice || 0,
-      expenseRatio: data.expenseRatio || 0.005,
-      peRatio: data.peRatio || 0,
-      volume: data.volume || 0,
-      bidAskSpread: data.bidAskSpread || 0.05,
-      trackingError: data.trackingError || 0.5,
-      totalAssets: data.totalAssets || 1e9,
-      dividendYield: data.dividendYield || 0,
-    }, symbol);
+        async function fetchAllETFData() {
+            const promises = etfSymbols.map(symbol => fetchETFData(symbol));
+            const results = await Promise.allSettled(promises);
+            
+            return results.map((result, index) => {
+                if (result.status === 'fulfilled') {
+                    return result.value;
+                } else {
+                    console.error(`Failed to fetch ${etfSymbols[index]}:`, result.reason);
+                    return {
+                      name: etfNames[symbol] || symbol,
+                      ticker: symbol,
+                      nav=0, 
+                      currentPrice=0,
+                      premiumDiscount=0,
+                      expenseRatio=0, 
+                      peRatio=0,
+                      efficiencyScore=0, 
+                      valuationScore=0,
+                      status=0,
+                    };
+                }
+            });
+        }
 
-  } catch (err) {
-    console.error(`Fetch error for ${symbol}:`, err);
-    return createErrorETF(symbol);
-  }
-}
-      
-function calculateETFValuation(data, symbol) {
-  const { currentPrice, nav, expenseRatio, peRatio, volume, bidAskSpread, trackingError, totalAssets, dividendYield } = data;
+        function formatCurrency(value) {
+            return "$" + value.toFixed(2);
+        }
 
-  const navPremiumDiscount = ((currentPrice - nav) / nav) * 100;
-  const efficiencyScore = calculateEfficiencyScore(expenseRatio, trackingError, bidAskSpread, volume, totalAssets);
-  const valuationScore = calculateValuationScore(navPremiumDiscount, efficiencyScore, expenseRatio, peRatio, dividendYield);
-  const status = determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore);
+        function formatPercentage(value) {
+            return (value > 0 ? "+" : "") + value.toFixed(1) + "%";
+        }
 
-  return {
-    name: etfNames[symbol] || symbol,
-    ticker: symbol,
-    nav, currentPrice,
-    premiumDiscount: navPremiumDiscount,
-    expenseRatio, peRatio,
-    efficiencyScore, valuationScore,
-    status
-  };
-}
+        function renderTable() {
+            const tbody = document.getElementById('etfTableBody');
+            
+            if (etfData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="loading"><div class="spinner"></div>Loading stock data...</td></tr>';
+                return;
+            }
 
-function calculateEfficiencyScore(expenseRatio, trackingError, bidAskSpread, volume, totalAssets) {
-  let expenseScore = Math.max(0, 100 - (expenseRatio * 20000));
-  let trackingScore = Math.max(0, 100 - (trackingError * 40));
-  let liquidityScore = Math.min(100, (volume / 1000000) * 20);
-  let spreadScore = Math.max(0, 100 - (bidAskSpread * 200));
-  let sizeScore = Math.min(100, Math.log10(totalAssets/1e6) * 20);
-  return expenseScore*0.3 + trackingScore*0.25 + liquidityScore*0.2 + spreadScore*0.15 + sizeScore*0.1;
-}
+            tbody.innerHTML = etfData.map(etf => {
+                const percentClass = etf.percentDiff > 0 ? 'positive' : 'negative';
+                const statusClass = etf.status === 'Undervalued' ? 'status-undervalued' : 'status-overvalued';
+                
+                return `
+                    <tr>
+                      <th onclick="sortTable(0)">ETF Name <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(1)">Ticker <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(2)">NAV <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(3)">Price <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(4)">Premium/Disc <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(5)">Expense Ratio <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(6)">P/E Ratio <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(7)">Efficiency <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(8)">Valuation <span class="sort-arrow">↕</span></th>
+                      <th onclick="sortTable(9)">Status <span class="sort-arrow">↕</span></th>
+                    </tr>
+                `;
+            }).join('');
+        }
 
-function calculateValuationScore(navPremiumDiscount, efficiencyScore, expenseRatio, peRatio, dividendYield) {
-  let navScore = Math.max(0, Math.min(100, 50 - (navPremiumDiscount * 10)));
-  let expenseScore = Math.max(0, 100 - (expenseRatio * 20000));
-  let peScore = peRatio ? Math.max(0, 100 - ((peRatio - 15) * 2)) : 50;
-  let dividendScore = Math.min(100, dividendYield * 200);
-  return navScore*0.4 + efficiencyScore*0.3 + expenseScore*0.15 + peScore*0.1 + dividendScore*0.05;
-}
+        function sortTable(columnIndex) {
+            if (sortColumn === columnIndex) {
+                sortDirection *= -1;
+            } else {
+                sortColumn = columnIndex;
+                sortDirection = -1;
+            }
 
-function determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore) {
-  if (valuationScore > 70 && navPremiumDiscount <= 0.5) return "Undervalued";
-  if (valuationScore < 40 || navPremiumDiscount > 1.0) return "Overvalued";
-  return "Fair Value";
-}
+            const keys = ['name','ticker','nav','currentPrice','premiumDiscount','expenseRatio','peRatio','efficiencyScore','valuationScore','status'];
+            const key = keys[columnIndex];
 
-function createErrorETF(symbol) {
-  return { name: etfNames[symbol] || symbol, ticker: symbol, nav:0,currentPrice:0,premiumDiscount:0,expenseRatio:0,peRatio:0,efficiencyScore:0,valuationScore:0,status:"Data Error" };
-}
+            stockData.sort((a, b) => {
+                let aVal = a[key];
+                let bVal = b[key];
 
-// ====================== UI (unchanged from your code) ======================
-// ... keep your renderTable, updateMetricsSummary, sortTable, filterTable, refreshData, init ...
+                // Handle numeric vs string comparison
+                if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
 
-// ====================== INIT ======================
-async function fetchAllETFData() {
-  const promises = etfSymbols.map(fetchRealETFData);
-  return Promise.all(promises);
-}
-function refreshData() {
-  document.getElementById('etfTableBody').innerHTML = '<tr><td colspan="10" class="loading"><div class="spinner"></div>Fetching real ETF data...</td></tr>';
-  fetchAllETFData().then(data => { etfData = data; sortTable(sortColumn); }).catch(err => console.error(err));
-}
+                if (aVal < bVal) return -1 * sortDirection;
+                if (aVal > bVal) return 1 * sortDirection;
+                return 0;
+            });
+
+            renderTable();
+            updateSortArrows();
+        }
+
+        function updateSortArrows() {
+            const arrows = document.querySelectorAll('.sort-arrow');
+            arrows.forEach((arrow, index) => {
+                if (index === sortColumn) {
+                    arrow.textContent = sortDirection === -1 ? '↓' : '↑';
+                } else {
+                    arrow.textContent = '↕';
+                }
+            });
+        }
+
+        function filterTable() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#etfTableBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        }
+
+        function refreshData() {
+            // Show loading state
+            document.getElementById('etfTableBody').innerHTML = 
+                '<tr><td colspan="10" class="loading"><div class="spinner"></div>Fetching real-time data from Yahoo Finance...</td></tr>';
+            
+            // Fetch real data from Yahoo Finance
+            fetchAllETFData()
+                .then(data => {
+                    etfData = data;
+                    sortTable(sortColumn);
+                })
+                .catch(error => {
+                    console.error('Error fetching stock data:', error);
+                    document.getElementById('stockTableBody').innerHTML = 
+                        '<tr><td colspan="10" class="loading" style="color: #f87171;">Error loading data. Please try again or check console for details.</td></tr>';
+                });
+        }
+
+
 function init() {
   refreshData();
   document.getElementById("searchInput").addEventListener("input", filterTable);
