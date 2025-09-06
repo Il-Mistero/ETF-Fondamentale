@@ -420,23 +420,31 @@ const etfNames = {
 let etfData = [];
 let sortColumn = 9, sortDirection = -1;
 
-async function fetchStockData(symbol) {
-            try {
-                const response = await fetch(`${API_BASE_URL}/stocks?symbol=${symbol}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
+// Fetch ETF data from your /api/stocks endpoint
+async function fetchRealETFData(symbol) {
+  try {
+    const response = await fetch(`/api/stocks?symbol=${symbol}`);
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+    // Apply valuation logic
+    return calculateETFValuation({
+      currentPrice: data.currentPrice || 0,
+      nav: data.navPrice || data.currentPrice || 0,
+      expenseRatio: data.expenseRatio || 0.005,
+      peRatio: data.peRatio || 0,
+      volume: data.volume || 0,
+      bidAskSpread: data.bidAskSpread || 0.05,
+      trackingError: data.trackingError || 0.5,
+      totalAssets: data.totalAssets || 1e9,
+      dividendYield: data.dividendYield || 0,
+    }, symbol);
 
-                const data = await response.json();
-            }
+  } catch (err) {
+    console.error(`Fetch error for ${symbol}:`, err);
+    return createErrorETF(symbol);
+  }
 }
-
       
 function calculateETFValuation(data, symbol) {
   const { currentPrice, nav, expenseRatio, peRatio, volume, bidAskSpread, trackingError, totalAssets, dividendYield } = data;
