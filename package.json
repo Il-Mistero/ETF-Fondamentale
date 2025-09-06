@@ -1,0 +1,19 @@
+{
+  "name": "etf-fondamentale-api",
+  "version": "1.0.0",
+  "description": "Serverless API for fetching Yahoo Finance stock data",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vercel": "^32.0.0"
+  },
+  "dependencies": {
+  "yahoo-finance2": "^2.12.0"
+}
+
+
+}
