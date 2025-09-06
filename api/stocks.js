@@ -1,4 +1,3 @@
-// /pages/api/stocks.js (Next.js API route on Vercel)
 import yahooFinance from "yahoo-finance2";
 
 export default async function handler(req, res) {
@@ -9,25 +8,37 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch price + financial data in one call
+    // Fetch price + ETF financial data
     const quote = await yahooFinance.quoteSummary(symbol, {
       modules: [
         "price",
         "summaryDetail",
         "defaultKeyStatistics",
         "financialData",
-        "incomeStatementHistory",
-        "balanceSheetHistory",
-        "cashflowStatementHistory",
-        "earnings",
+        "fundProfile",
       ],
     });
 
     const result = {
       symbol,
+
+      // Price data
       currentPrice: quote.price?.regularMarketPrice || null,
       previousClose: quote.price?.regularMarketPreviousClose || null,
       marketCap: quote.price?.marketCap || null,
+      volume: quote.price?.regularMarketVolume || null,
+
+      // ETF fundamentals
+      navPrice: quote.summaryDetail?.navPrice || null,
+      expenseRatio:
+        quote.summaryDetail?.expenseRatio ||
+        quote.fundProfile?.annualReportExpenseRatio ||
+        null,
+      totalAssets: quote.summaryDetail?.totalAssets || null,
+      bidAskSpread: quote.summaryDetail?.bidAskSpread || null,
+      trackingError: quote.fundProfile?.trackingError || null,
+
+      // Classic stock fundamentals (for completeness)
       sharesOutstanding: quote.defaultKeyStatistics?.sharesOutstanding || null,
       freeCashflow: quote.financialData?.freeCashflow || null,
       eps: quote.defaultKeyStatistics?.trailingEps || null,
@@ -43,6 +54,7 @@ export default async function handler(req, res) {
       dividendRate: quote.summaryDetail?.dividendRate || null,
       dividendYield: quote.summaryDetail?.dividendYield || null,
       beta: quote.summaryDetail?.beta || null,
+
       timestamp: new Date().toISOString(),
     };
 
@@ -51,4 +63,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 }
-
