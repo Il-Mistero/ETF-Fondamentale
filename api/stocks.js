@@ -20,8 +20,6 @@ export default async function handler(req, res) {
       ],
     });
 
-    console.log(`Raw fundProfile for ${symbol}:`, JSON.stringify(quote.fundProfile, null, 2));
-
     const result = {
       symbol,
 
