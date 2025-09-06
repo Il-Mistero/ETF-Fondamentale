@@ -31,11 +31,12 @@ export default async function handler(req, res) {
       // ETF fundamentals
       navPrice: quote.summaryDetail?.navPrice || null,
       expenseRatio:
-        quote.summaryDetail?.expenseRatio ||
-        quote.fundProfile?.annualReportExpenseRatio ||
+        quote.summaryDetail?.netExpenseRatio ||
+        quote.fundProfile?.netExpenseRatio ||
         null,
       totalAssets: quote.summaryDetail?.totalAssets || null,
-      bidAskSpread: quote.summaryDetail?.bidAskSpread || null,
+      bidPrice: quote.summaryDetail?.bid|| null,
+      askPrice: quote.summaryDetail?.ask|| null,
       trackingError: quote.fundProfile?.trackingError || null,
 
       // Classic stock fundamentals (for completeness)
