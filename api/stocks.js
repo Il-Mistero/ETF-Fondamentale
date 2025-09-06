@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
       // ETF fundamentals
       navPrice: quote.summaryDetail?.navPrice || null,
-      expenseRatio: quote.fundProfile?.feesExpensesInvestment?.netExpRatio || null,
+      expenseRatio: quote.fundProfile?.feesExpensesInvestment?.annualReportExpenseRatio || null,
       totalAssets: quote.summaryDetail?.totalAssets || null,
       bidPrice: quote.summaryDetail?.bid|| null,
       askPrice: quote.summaryDetail?.ask|| null,
