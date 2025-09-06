@@ -385,7 +385,7 @@
           <th onclick="sortTable(1)">Ticker <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable(2)">NAV <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable(3)">Price <span class="sort-arrow">↕</span></th>
-          <th onclick="sortTable(4)">Premium/Disc <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable(4)">P/D <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable(5)">Expense Ratio <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable(6)">P/E Ratio <span class="sort-arrow">↕</span></th>
           <th onclick="sortTable(7)">Efficiency <span class="sort-arrow">↕</span></th>
@@ -449,7 +449,7 @@ let sortColumn = 9, sortDirection = -1;
         function calculateETFValuation(data, symbol) {
           const { currentPrice, nav, expenseRatio, peRatio, volume, bidPrice, askPrice, totalAssets, dividendYield } = data;
         
-          const navPremiumDiscount = ((currentPrice - nav) / nav) * 100;
+          const navPremiumDiscount = ((nav - currentPrice) / nav) * 100;
           const efficiencyScore = calculateEfficiencyScore(expenseRatio, nav, currentPrice, bidPrice, askPrice, volume, totalAssets);
           const valuationScore = calculateValuationScore(navPremiumDiscount, efficiencyScore, expenseRatio, peRatio, dividendYield);
           const status = determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore);
@@ -483,8 +483,8 @@ let sortColumn = 9, sortDirection = -1;
         }
         
         function determineETFStatus(navPremiumDiscount, valuationScore, efficiencyScore) {
-          if (valuationScore > 70 && navPremiumDiscount <= 0.5) return "Undervalued";
-          if (valuationScore < 40 || navPremiumDiscount > 1.0) return "Overvalued";
+          if (valuationScore > 60 && navPremiumDiscount >= 0.25) return "Undervalued";
+          if (valuationScore < 40 || navPremiumDiscount <= -0.25) return "Overvalued";
           return "Fair Value";
         }
         
