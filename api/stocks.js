@@ -16,6 +16,7 @@ export default async function handler(req, res) {
         "defaultKeyStatistics",
         "financialData",
         "fundProfile",
+        "earnings",
       ],
     });
 
@@ -33,6 +34,7 @@ export default async function handler(req, res) {
       expenseRatio:
         quote.summaryDetail?.netExpenseRatio ||
         quote.fundProfile?.netExpenseRatio ||
+        quote.earnings?.netExpenseRatio ||
         null,
       totalAssets: quote.summaryDetail?.totalAssets || null,
       bidPrice: quote.summaryDetail?.bid|| null,
