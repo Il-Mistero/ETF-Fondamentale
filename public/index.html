@@ -431,7 +431,9 @@ async function fetchStockData(symbol) {
 
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                };
+            };
+}
 
       
 function calculateETFValuation(data, symbol) {
